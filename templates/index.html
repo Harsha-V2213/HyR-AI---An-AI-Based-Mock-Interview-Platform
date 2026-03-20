@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Mock Interview Platform</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #121212; color: #ffffff; margin: 0; padding: 20px; display: flex; gap: 20px; }
+        .video-section { flex: 1; text-align: center; }
+        .video-container { border: 3px solid #00ffcc; border-radius: 8px; overflow: hidden; box-shadow: 0 0 15px rgba(0, 255, 204, 0.3); display: inline-block; }
+        
+        .chat-section { flex: 1; background-color: #1e1e1e; border-radius: 8px; padding: 20px; display: flex; flex-direction: column; border: 1px solid #333; }
+        .status-badge { background-color: #333; padding: 8px 15px; border-radius: 20px; display: inline-block; font-size: 0.9em; margin-bottom: 20px; color: #00ffcc; }
+        
+        .question-box { background-color: #2a2a2a; padding: 20px; border-radius: 8px; flex-grow: 1; font-size: 1.2em; line-height: 1.5; border-left: 4px solid #00ffcc; margin-bottom: 20px; }
+        .score-box { color: #aaaaaa; font-size: 0.9em; margin-top: 15px; }
+        
+        button { background-color: #00ffcc; color: #121212; border: none; padding: 15px 20px; font-size: 1.1em; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.3s; }
+        button:hover { background-color: #00cca3; }
+    </style>
+</head>
+<body>
+
+    <div class="video-section">
+        <h2>🎥 AI Behavioral Proctor</h2>
+        <div class="video-container">
+            <img src="{{ url_for('video_feed') }}" width="640" height="480" alt="Camera loading...">
+        </div>
+    </div>
+
+    <div class="chat-section">
+        <h2>🧠 Interview Console</h2>
+        <div class="status-badge" id="ai-status">AI Status: Waiting to start...</div>
+        
+        <div class="question-box">
+            <strong style="color: #00ffcc;">Current Question:</strong>
+            <p id="question-text">Click "Start Interview" to begin analyzing your resume.</p>
+            <div class="score-box" id="score-text">Semantic Score: --</div>
+        </div>
+
+        <button id="action-btn" onclick="triggerAction()">Start Interview</button>
+    </div>
+
+    <script>
+        // Fetch the AI status every 1 second
+        setInterval(() => {
+            fetch('/get_status')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('ai-status').innerText = "AI Status: " + data.status;
+                    document.getElementById('question-text').innerText = data.current_question;
+                    document.getElementById('score-text').innerText = "Latest Semantic Score: " + data.latest_score + "%";
+                });
+        }, 1000);
+
+        // Tell Flask when the user clicks the button
+        function triggerAction() {
+            fetch('/next_action', { method: 'POST' });
+            document.getElementById('action-btn').innerText = "Submit Answer / Next";
+        }
+    </script>
+</body>
+</html>
