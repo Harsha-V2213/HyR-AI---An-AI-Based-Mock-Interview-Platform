@@ -1,63 +1,80 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Mock Interview Platform</title>
+    <title>AI-Based Mock Interview Platform</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #121212; color: #ffffff; margin: 0; padding: 20px; display: flex; gap: 20px; }
-        .video-section { flex: 1; text-align: center; }
-        .video-container { border: 3px solid #00ffcc; border-radius: 8px; overflow: hidden; box-shadow: 0 0 15px rgba(0, 255, 204, 0.3); display: inline-block; }
-        
-        .chat-section { flex: 1; background-color: #1e1e1e; border-radius: 8px; padding: 20px; display: flex; flex-direction: column; border: 1px solid #333; }
-        .status-badge { background-color: #333; padding: 8px 15px; border-radius: 20px; display: inline-block; font-size: 0.9em; margin-bottom: 20px; color: #00ffcc; }
-        
-        .question-box { background-color: #2a2a2a; padding: 20px; border-radius: 8px; flex-grow: 1; font-size: 1.2em; line-height: 1.5; border-left: 4px solid #00ffcc; margin-bottom: 20px; }
-        .score-box { color: #aaaaaa; font-size: 0.9em; margin-top: 15px; }
-        
-        button { background-color: #00ffcc; color: #121212; border: none; padding: 15px 20px; font-size: 1.1em; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.3s; }
-        button:hover { background-color: #00cca3; }
+        body { background-color: #f4f7f9; }
+        .main-card { border-radius: 15px; border: none; min-height: 400px; }
+        .badge-status { font-size: 1rem; padding: 8px 16px; border-radius: 50px; }
     </style>
 </head>
-<body>
-
-    <div class="video-section">
-        <h2>🎥 AI Behavioral Proctor</h2>
-        <div class="video-container">
-            <img src="{{ url_for('video_feed') }}" width="640" height="480" alt="Camera loading...">
+<body class="container py-5">
+    <div class="row g-4">
+        <div class="col-md-7">
+            <div class="card shadow rounded-3 overflow-hidden">
+                <img src="{{ url_for('video_feed') }}" class="img-fluid" alt="Webcam Behavioral Analysis">
+            </div>
         </div>
-    </div>
-
-    <div class="chat-section">
-        <h2>🧠 Interview Console</h2>
-        <div class="status-badge" id="ai-status">AI Status: Waiting to start...</div>
-        
-        <div class="question-box">
-            <strong style="color: #00ffcc;">Current Question:</strong>
-            <p id="question-text">Click "Start Interview" to begin analyzing your resume.</p>
-            <div class="score-box" id="score-text">Semantic Score: --</div>
+        <div class="col-md-5">
+            <div class="card main-card shadow p-4 d-flex flex-column">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="text-secondary mb-0">AI Session</h5>
+                    <span id="statusBadge" class="badge bg-primary badge-status">Initializing...</span>
+                </div>
+                <hr>
+                <div class="flex-grow-1 d-flex align-items-center">
+                    <h3 id="questionText" class="text-center w-100">Click to Begin</h3>
+                </div>
+                <div class="mt-4">
+                    <button id="mainBtn" onclick="triggerAction()" class="btn btn-primary btn-lg w-100 py-3">Start Interview</button>
+                    <div id="statusText" class="text-muted small text-center mt-2">Ready for analysis.</div>
+                </div>
+            </div>
         </div>
-
-        <button id="action-btn" onclick="triggerAction()">Start Interview</button>
     </div>
 
     <script>
-        // Fetch the AI status every 1 second
-        setInterval(() => {
+        function updateUI() {
             fetch('/get_status')
-                .then(response => response.json())
+                .then(r => r.json())
                 .then(data => {
-                    document.getElementById('ai-status').innerText = "AI Status: " + data.status;
-                    document.getElementById('question-text').innerText = data.current_question;
-                    document.getElementById('score-text').innerText = "Latest Semantic Score: " + data.latest_score + "%";
-                });
-        }, 1000);
+                    const btn = document.getElementById('mainBtn');
+                    const statusText = document.getElementById('statusText');
+                    const questionText = document.getElementById('questionText');
+                    const badge = document.getElementById('statusBadge');
 
-        // Tell Flask when the user clicks the button
+                    statusText.innerText = data.status;
+                    questionText.innerText = data.current_question;
+                    badge.innerText = data.current_state;
+
+                    // BUTTON LOGIC MAPPING
+                    if (data.is_busy) {
+                        btn.disabled = true;
+                        btn.innerText = "Please Wait...";
+                        btn.className = "btn btn-secondary btn-lg w-100 py-3";
+                    } else if (data.current_state === "IDLE") {
+                        btn.innerText = "Start Interview";
+                        btn.className = "btn btn-primary btn-lg w-100 py-3";
+                    } else if (data.current_state === "QUESTION") {
+                        btn.innerText = "Start Recording Answer";
+                        btn.className = "btn btn-danger btn-lg w-100 py-3";
+                    } else if (data.current_state === "RECORDING") {
+                        btn.innerText = "Submit & Next Question";
+                        btn.className = "btn btn-success btn-lg w-100 py-3";
+                    } else if (data.current_state === "COMPLETE") {
+                        btn.disabled = true;
+                        btn.innerText = "Interview Finished";
+                        btn.className = "btn btn-dark btn-lg w-100 py-3";
+                    }
+                });
+        }
+
         function triggerAction() {
             fetch('/next_action', { method: 'POST' });
-            document.getElementById('action-btn').innerText = "Submit Answer / Next";
         }
+
+        setInterval(updateUI, 1000);
     </script>
 </body>
 </html>
