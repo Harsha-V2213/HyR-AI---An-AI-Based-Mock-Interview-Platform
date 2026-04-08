@@ -1,104 +1,229 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import AudioVisualizer from '../components/AudioVisualizer';
+import { auth } from '../firebase'; 
 
-export default function InterviewSession() {
-    const [status, setStatus] = useState({});
+const InterviewSession = () => {
     const navigate = useNavigate();
     
+    // --- STATE ---
+    const [aiState, setAiState] = useState({
+        status: "Connecting...",
+        current_state: "IDLE",
+        current_question: "Loading your interview...",
+        is_busy: false,
+    });
+    const [behavior, setBehavior] = useState({ status: "Waiting for camera...", emotion: null });
+    const [frameCount, setFrameCount] = useState(0);
+
+    // --- REFS FOR BROWSER HARDWARE ---
+    const videoRef = useRef(null);
+    const canvasRef = useRef(null);
+    const mediaRecorderRef = useRef(null);
+    const audioChunksRef = useRef([]);
+    const frameIntervalRef = useRef(null);
+
+    // 1. INITIALIZE CAMERA & MICROPHONE
     useEffect(() => {
-        const interval = setInterval(async () => {
+        const startHardware = async () => {
             try {
-                const res = await axios.get("http://localhost:5000/get_status");
-                setStatus(res.data);
-            } catch(e) {
-                console.error(e);
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                
+                if (videoRef.current) {
+                    videoRef.current.srcObject = stream;
+                }
+
+                const mediaRecorder = new MediaRecorder(stream);
+                mediaRecorderRef.current = mediaRecorder;
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        audioChunksRef.current.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = async () => {
+                    setAiState(prev => ({ ...prev, is_busy: true, status: "Analyzing your response..." }));
+                    
+                    const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+                    const formData = new FormData();
+                    formData.append('audio', audioBlob, 'answer.wav');
+                    
+                    audioChunksRef.current = []; 
+
+                    try {
+                        const token = await auth.currentUser.getIdToken();
+                        await axios.post('http://localhost:5000/api/process_audio', formData, {
+                            headers: { 
+                                'Authorization': `Bearer ${token}`,
+                                'Content-Type': 'multipart/form-data'
+                            }
+                        });
+                        
+                        fetchSessionState();
+                    } catch (error) {
+                        console.error("Error sending audio:", error);
+                        setAiState(prev => ({ ...prev, is_busy: false, status: "Error processing audio." }));
+                    }
+                };
+
+                startVideoProctor();
+
+            } catch (err) {
+                console.error("Hardware Error:", err);
+                setBehavior({ status: "Camera/Mic blocked by browser.", emotion: null });
             }
-        }, 1000);
-        return () => clearInterval(interval);
+        };
+
+        startHardware();
+        fetchSessionState();
+
+        return () => {
+            if (videoRef.current && videoRef.current.srcObject) {
+                videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+            }
+            clearInterval(frameIntervalRef.current);
+        };
     }, []);
 
-    const handleAction = async () => {
-        if (status.current_state === "COMPLETE") {
-            navigate('/history');
-            return;
-        }
-        await axios.post("http://localhost:5000/next_action");
+    // 2. THE VIDEO PROCTOR
+    const startVideoProctor = () => {
+        frameIntervalRef.current = setInterval(() => {
+            if (videoRef.current && canvasRef.current) {
+                const canvas = canvasRef.current;
+                const context = canvas.getContext('2d');
+                
+                context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+                
+                const base64Image = canvas.toDataURL('image/jpeg');
+                setFrameCount(prev => prev + 1);
+
+                axios.post('http://localhost:5000/api/process_frame', { 
+                    image: base64Image, 
+                    frame_counter: frameCount 
+                })
+                .then(res => setBehavior(res.data))
+                .catch(err => console.error("Proctor API Error:", err));
+            }
+        }, 1000); 
     };
 
-    return (
-        <div className="max-w-7xl mx-auto pt-24 pb-12 px-6 flex flex-col lg:flex-row gap-8 items-stretch relative z-10">
-            <div className="w-full lg:w-[55%] flex flex-col">
-                <div className="relative rounded-3xl overflow-hidden border border-slate-200/60 shadow-xl shadow-slate-200/50 bg-slate-900 aspect-video flex-grow">
-                    <img src="http://localhost:5000/video_feed" className="w-full h-full object-cover" alt="Session Feed" />
-                    <div className="absolute top-4 left-4 bg-slate-900/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-2">
-                        <span className={`w-2 h-2 rounded-full ${status.current_state === "RECORDING" ? "bg-red-500 animate-pulse" : "bg-emerald-400"}`}></span> 
-                        <span className="text-[10px] font-bold text-white uppercase tracking-widest">
-                            {status.current_state === "RECORDING" ? "Recording Active" : "Camera Live"}
-                        </span>
-                    </div>
-                </div>
-            </div>
+    // 3. FETCH AI STATE
+    const fetchSessionState = async () => {
+        try {
+            const token = await auth.currentUser?.getIdToken();
+            const res = await axios.get('http://localhost:5000/get_status', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            setAiState(res.data);
+            
+            if (res.data.current_state === "COMPLETE") {
+                clearInterval(frameIntervalRef.current);
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    };
 
-            <div className="w-full lg:w-[45%] flex flex-col space-y-6">
-                <div className="flex-grow bg-white/70 backdrop-blur-xl p-8 lg:p-10 rounded-3xl border border-slate-200/60 shadow-xl shadow-slate-200/40 flex flex-col justify-center">
-                    <div className="flex justify-between items-center mb-6">
-                        <span className="text-[11px] font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 uppercase tracking-widest">
-                            {status.current_state === "COMPLETE" ? "Session Complete" : "Interviewer Output"}
-                        </span>
-                        <span className="text-[10px] font-mono font-semibold text-slate-400 bg-slate-100 px-2 py-1 rounded-md">
-                            {status.status}
-                        </span>
-                    </div>
+    // --- BUTTON CONTROLS ---
+    const handleStartRecording = () => {
+        if (mediaRecorderRef.current) {
+            mediaRecorderRef.current.start();
+            setAiState(prev => ({ ...prev, current_state: "RECORDING", status: "Listening..." }));
+        }
+    };
+
+    const handleStopRecording = () => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+            mediaRecorderRef.current.stop();
+        }
+    };
+
+    const handleEndInterview = () => navigate('/history');
+
+    return (
+        <div className="min-h-screen bg-gray-50 flex flex-col items-center py-12 px-4 sm:px-6 lg:px-8">
+            <h1 className="text-3xl font-extrabold text-gray-900 mb-8 text-center tracking-tight">
+                Live Mock Interview
+            </h1>
+            
+            <div className="w-full max-w-4xl bg-white rounded-2xl shadow-xl p-8 flex flex-col items-center">
+                
+                {/* --- TOP: Status Pill --- */}
+                <div className="mb-6">
+                    <span className="bg-indigo-100 text-indigo-800 text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider">
+                        {aiState.status}
+                    </span>
+                </div>
+
+                {/* --- CENTER: Video Feed --- */}
+                <div className="relative w-full max-w-2xl aspect-video bg-black rounded-xl overflow-hidden mb-6 shadow-inner border border-gray-200">
+                    <video 
+                        ref={videoRef} 
+                        autoPlay 
+                        muted 
+                        playsInline 
+                        className="w-full h-full object-cover transform scale-x-[-1]" 
+                    />
+                    <canvas ref={canvasRef} width="640" height="480" className="hidden" />
+                </div>
+
+                {/* --- CENTER: Behavior Analytics --- */}
+                <div className="w-full max-w-2xl flex justify-between px-6 py-3 bg-gray-50 border border-gray-100 rounded-lg text-sm font-semibold mb-10 text-center">
+                    <span className={behavior.status.includes("Lost") ? "text-red-500" : "text-emerald-600"}>
+                        {behavior.status}
+                    </span>
+                    <span className="text-blue-600">
+                        Video Feed : {behavior.emotion ? behavior.emotion.toUpperCase() : "ANALYZING..."}
+                    </span>
+                </div>
+
+                {/* --- BOTTOM: Question & Controls --- */}
+                <div className="w-full max-w-2xl flex flex-col items-center text-center">
+                    <h2 className="text-2xl font-semibold text-gray-800 mb-8 leading-relaxed">
+                        {aiState.current_state === "COMPLETE" ? "Interview Complete" : aiState.current_question}
+                    </h2>
                     
-                    {status.current_state === "COMPLETE" && status.results ? (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-                            <div className="bg-blue-50/50 border border-blue-100 p-4 rounded-2xl text-center">
-                                <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-1">Semantic</p>
-                                <p className="text-3xl font-extrabold text-slate-800">{status.results.semantic}</p>
+                    {aiState.current_state === "COMPLETE" && aiState.results && (
+                        <div className="bg-emerald-50 border border-emerald-200 p-6 rounded-xl mb-8 w-full">
+                            <p className="font-bold text-emerald-800 text-lg mb-4">Final Evaluation</p>
+                            <div className="space-y-2 text-emerald-900 font-medium">
+                                <p>Overall CRI: {aiState.results.cri}/100</p>
+                                <p>Semantic Match: {aiState.results.semantic}%</p>
+                                <p>Behavioral Score: {aiState.results.behavioral}%</p>
                             </div>
-                            <div className="bg-indigo-50/50 border border-indigo-100 p-4 rounded-2xl text-center">
-                                <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-1">Behavioral</p>
-                                <p className="text-3xl font-extrabold text-slate-800">{status.results.behavioral}</p>
-                            </div>
-                            <div className="bg-emerald-50/50 border border-emerald-100 p-4 rounded-2xl text-center">
-                                <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mb-1">Overall CRI</p>
-                                <p className="text-3xl font-extrabold text-slate-800">{status.results.cri}</p>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="flex flex-col space-y-6">
-                            <p className="text-2xl lg:text-3xl font-bold text-slate-800 leading-tight">
-                                "{status.current_question || "Establishing connection with AI Engine..."}"
-                            </p>
-                            
-                            {status.current_state === "RECORDING" && (
-                                <AudioVisualizer isRecording={true} />
-                            )}
                         </div>
                     )}
+
+                    {/* Action Buttons */}
+                    <div className="mt-4 w-full flex justify-center">
+                        {aiState.is_busy ? (
+                            <button disabled className="bg-gray-400 text-white px-8 py-3.5 rounded-lg font-bold flex items-center shadow-sm cursor-not-allowed transition-all">
+                                <svg className="animate-spin h-5 w-5 mr-3 text-white" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Processing Response
+                            </button>
+                        ) : aiState.current_state === "COMPLETE" ? (
+                            <button onClick={handleEndInterview} className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3.5 rounded-lg font-bold shadow-md transition-all w-full max-w-xs">
+                                View History
+                            </button>
+                        ) : aiState.current_state === "RECORDING" ? (
+                            <button onClick={handleStopRecording} className="bg-red-600 hover:bg-red-700 text-white px-8 py-3.5 rounded-lg font-bold shadow-md animate-pulse w-full max-w-xs">
+                                Stop Answering
+                            </button>
+                        ) : (
+                            <button onClick={handleStartRecording} className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3.5 rounded-lg font-bold shadow-md transition-all w-full max-w-xs">
+                                Start Answering
+                            </button>
+                        )}
+                    </div>
                 </div>
-                
-                <button 
-                    onClick={handleAction}
-                    disabled={status.is_busy || status.current_state === "ANALYZING"}
-                    className={`w-full py-5 rounded-2xl font-bold text-lg transition-all duration-300 ${
-                        status.current_state === "RECORDING" 
-                        ? "bg-red-500 text-white shadow-lg shadow-red-500/30 hover:bg-red-600 hover:-translate-y-0.5" 
-                        : status.current_state === "ANALYZING" || status.is_busy
-                        ? "bg-slate-200 text-slate-500 cursor-not-allowed border border-slate-300/50" 
-                        : status.current_state === "COMPLETE"
-                        ? "bg-slate-900 text-white shadow-xl shadow-slate-900/20 hover:bg-slate-800 hover:-translate-y-0.5"
-                        : "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xl shadow-blue-500/30 hover:shadow-blue-500/50 hover:-translate-y-0.5"
-                    }`}
-                >
-                    {status.current_state === "RECORDING" ? "Stop Recording & Submit" 
-                     : status.current_state === "ANALYZING" || status.is_busy ? "Evaluating Semantics..."
-                     : status.current_state === "COMPLETE" ? "View Full Archives" 
-                     : "Start Response"}
-                </button>
+
             </div>
         </div>
     );
-}
+};
+
+export default InterviewSession;

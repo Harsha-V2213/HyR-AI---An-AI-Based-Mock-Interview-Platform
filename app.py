@@ -1,27 +1,24 @@
-from flask import Flask, Response, jsonify, request
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from dotenv import load_dotenv
 import firebase_admin
 from firebase_admin import credentials, auth
 from functools import wraps
-import threading
-import sys
 import os
 from datetime import datetime
 import traceback
 
 load_dotenv()
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
 
 from backend.models.resume_parser import parse_resume
 from backend.models.question_generator import generate_questions
-from backend.models.speech_analyzer import start_recording_mic, stop_recording_mic, evaluate_semantics
-# 🚨 IMPORTING THE WEB-ADAPTED PROCTOR 🚨
-from backend.models.interview_proctor import generate_video_frames, behavior_metrics, reset_behavior_metrics
+from backend.models.speech_analyzer import transcribe_audio, evaluate_semantics
+from backend.models.interview_proctor import analyze_video_frame, behavior_metrics, reset_behavior_metrics
 
 app = Flask(__name__)
-CORS(app) 
+# Allow CORS for your frontend
+CORS(app, resources={r"/*": {"origins": "*"}}) 
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -85,28 +82,6 @@ ai_state = {
 }
 
 semantic_scores = []
-
-def process_audio_worker():
-    global ai_state, semantic_scores
-    try:
-        ai_state["status"] = "Analyzing response..."
-        user_transcript = stop_recording_mic()
-        
-        if "Error" not in user_transcript:
-            current_q = ai_state["current_question"]
-            score = evaluate_semantics(user_transcript, f"A detailed, accurate answer to: {current_q}")
-            semantic_scores.append(score)
-        
-        ai_state["current_q_index"] += 1
-        
-        if ai_state["current_q_index"] < len(ai_state["questions"]):
-            ai_state["current_question"] = ai_state["questions"][ai_state["current_q_index"]]
-            ai_state["current_state"] = "QUESTION"
-        else:
-            ai_state["current_state"] = "COMPLETE"
-            calculate_final_cri()
-    finally:
-        ai_state["is_busy"] = False
 
 def calculate_final_cri():
     global ai_state, semantic_scores
@@ -182,18 +157,68 @@ def get_status(): return jsonify(ai_state)
 @app.route('/next_action', methods=['POST'])
 def next_action():
     if ai_state.get("is_busy"): return jsonify({"success": False})
+    
+    # In the cloud flow, React triggers RECORDING state, and React stops it by POSTing the audio
     if ai_state["current_state"] == "QUESTION":
         ai_state["current_state"] = "RECORDING"
-        start_recording_mic()
-    elif ai_state["current_state"] == "RECORDING":
-        ai_state["is_busy"] = True
-        ai_state["current_state"] = "ANALYZING"
-        threading.Thread(target=process_audio_worker).start()
+    
     return jsonify({"success": True})
 
-@app.route('/video_feed')
-def video_feed(): 
-    return Response(generate_video_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+# 🚨 THE NEW CLOUD AUDIO ENDPOINT 🚨
+@app.route('/api/process_audio', methods=['POST'])
+def process_audio():
+    global ai_state, semantic_scores
+    
+    if 'audio' not in request.files:
+        return jsonify({"error": "No audio file provided"}), 400
+        
+    ai_state["is_busy"] = True
+    ai_state["current_state"] = "ANALYZING"
+    ai_state["status"] = "Analyzing response..."
+    
+    audio_file = request.files['audio']
+    temp_path = "temp_answer.wav"
+    audio_file.save(temp_path)
+    
+    try:
+        # Transcribe audio using the stateless function
+        user_transcript = transcribe_audio(temp_path)
+        
+        # Grade the semantic similarity
+        if "Error" not in user_transcript:
+            current_q = ai_state["current_question"]
+            score = evaluate_semantics(user_transcript, f"A detailed, accurate answer to: {current_q}")
+            semantic_scores.append(score)
+            
+        ai_state["current_q_index"] += 1
+        
+        # Progress logic
+        if ai_state["current_q_index"] < len(ai_state["questions"]):
+            ai_state["current_question"] = ai_state["questions"][ai_state["current_q_index"]]
+            ai_state["current_state"] = "QUESTION"
+        else:
+            ai_state["current_state"] = "COMPLETE"
+            calculate_final_cri()
+            
+    finally:
+        ai_state["is_busy"] = False
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+            
+    return jsonify({"success": True, "transcript": user_transcript})
+
+# 🚨 THE NEW CLOUD VIDEO ENDPOINT 🚨
+@app.route('/api/process_frame', methods=['POST'])
+def process_frame():
+    data = request.json
+    base64_image = data.get('image')
+    frame_counter = data.get('frame_counter', 1)
+    
+    if not base64_image:
+        return jsonify({"error": "No image provided"}), 400
+        
+    results = analyze_video_frame(base64_image, frame_counter)
+    return jsonify(results)
 
 if __name__ == '__main__':
     app.run(debug=True, threaded=True, port=5000)
