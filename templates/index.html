@@ -54,12 +54,15 @@
                         btn.innerText = "Please Wait...";
                         btn.className = "btn btn-secondary btn-lg w-100 py-3";
                     } else if (data.current_state === "IDLE") {
+                        btn.disabled = false;
                         btn.innerText = "Start Interview";
                         btn.className = "btn btn-primary btn-lg w-100 py-3";
                     } else if (data.current_state === "QUESTION") {
+                        btn.disabled = false;
                         btn.innerText = "Start Recording Answer";
                         btn.className = "btn btn-danger btn-lg w-100 py-3";
                     } else if (data.current_state === "RECORDING") {
+                        btn.disabled = false;
                         btn.innerText = "Submit & Next Question";
                         btn.className = "btn btn-success btn-lg w-100 py-3";
                     } else if (data.current_state === "COMPLETE") {
@@ -72,6 +75,8 @@
 
         function triggerAction() {
             fetch('/next_action', { method: 'POST' });
+            // Immediately force UI update to feel responsive
+            setTimeout(updateUI, 200); 
         }
 
         setInterval(updateUI, 1000);
