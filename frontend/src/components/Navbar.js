@@ -1,42 +1,61 @@
-import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
 import { auth } from '../firebase';
-import { signOut } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { useNavigate, Link } from 'react-router-dom';
 
-export default function Navbar({ user }) {
+const Navbar = () => {
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
-    
-    const handleSignOut = async () => { 
-        await signOut(auth); 
-        navigate('/login'); 
+
+    useEffect(() => {
+        // Listen for Firebase Auth state changes
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+            setUser(currentUser);
+            setLoading(false); // Auth check is complete
+        });
+        return () => unsubscribe();
+    }, []);
+
+    const handleLogout = async () => {
+        try {
+            await signOut(auth);
+            navigate('/login');
+        } catch (error) {
+            console.error("Logout Error:", error);
+        }
     };
 
     return (
-        <nav className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-slate-200/60 transition-all">
-            {/* Glassmorphism effect applied to nav wrapper above */}
-            <div className="max-w-7xl mx-auto px-6 h-16 flex justify-between items-center">
-                <Link to="/" className="text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
-                        <span className="text-white text-sm">AI</span>
-                    </div>
-                    HyR-AI
-                </Link>
-                
-                <div className="flex items-center gap-8 text-sm font-medium">
-                    {user ? (
-                        <>
-                            <Link to="/upload" className="text-slate-600 hover:text-blue-600 transition-colors">New Interview</Link>
-                            <Link to="/history" className="text-slate-600 hover:text-blue-600 transition-colors">History</Link>
-                            <div className="h-4 w-px bg-slate-200"></div>
-                            <button onClick={handleSignOut} className="text-slate-400 hover:text-red-500 transition-colors">Log out</button>
-                        </>
-                    ) : (
-                        <Link to="/login" className="px-5 py-2.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200">
-                            Sign in
-                        </Link>
-                    )}
-                </div>
+        <nav className="flex justify-between items-center p-6 bg-white shadow-sm">
+            <Link to="/" className="text-2xl font-bold text-gray-900 tracking-tight">
+                HyR AI
+            </Link>
+            
+            <div className="flex gap-4">
+                {/* Only show buttons once we know the login status */}
+                {!loading && (
+                    <>
+                        {user ? (
+                            <button 
+                                onClick={handleLogout} 
+                                className="px-5 py-2 rounded-lg font-semibold text-gray-700 hover:bg-gray-100 transition-all"
+                            >
+                                Log Out
+                            </button>
+                        ) : (
+                            <Link 
+                                to="/login" 
+                                className="px-5 py-2 rounded-lg font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-all"
+                            >
+                                Log In
+                            </Link>
+                        )}
+                    </>
+                )}
             </div>
         </nav>
     );
-}
+};
+
+export default Navbar;
