@@ -1,12 +1,15 @@
 import os
-import re
-from mistralai import Mistral
 from dotenv import load_dotenv
+import re
 
-# Load environment variables
+# Use the specific client path to bypass namespace issues
+try:
+    from mistralai.client import Mistral
+except ImportError:
+    from mistralai import Mistral
+
 load_dotenv()
-api_key = os.getenv("MISTRAL_API_KEY")
-client = Mistral(api_key=api_key)
+client = Mistral(api_key=os.getenv("MISTRAL_API_KEY"))
 
 def generate_questions(resume_text, role, num_questions=5):
     is_hr = "HR / Behavioral" in role
@@ -43,7 +46,7 @@ def generate_questions(resume_text, role, num_questions=5):
             "   - Question 2 (CS Fundamental): Ask about core CS fundamentals (e.g., OOP principles, basic SQL, HTTP requests). "
             "   - Question 3 (Basic DSA): Ask a basic programming logic concept (e.g., arrays, loops, strings). "
             "   - Question 4 (Situational): Ask how they would handle a basic workplace scenario (e.g., debugging a tough error, working with a team). "
-            "   - Question 5 (Project Deep Dive): Ask them to describe the overarching goal or a basic challenge of a specific project on their resume. "
+            "   - Question 5 (Project Deep Dive): Ask them to describle their projects listed on their resume."
             "3. KEEP IT SHORT: Ask exactly ONE simple, single-part question at a time."
         )
 
