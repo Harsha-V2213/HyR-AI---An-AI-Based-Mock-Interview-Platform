@@ -44,18 +44,26 @@ export default function History() {
                             <thead className="bg-slate-50/80 border-b border-slate-200/60">
                                 <tr>
                                     <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Date</th>
-                                    <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Configuration Profile</th>
+                                    <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Profile</th>
+                                    <th className="px-8 py-5 text-center text-[11px] font-bold text-slate-500 uppercase tracking-widest">Semantic</th>
+                                    <th className="px-8 py-5 text-center text-[11px] font-bold text-slate-500 uppercase tracking-widest">Behavioral</th>
                                     <th className="px-8 py-5 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest">Final CRI Score</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {pastInterviews.map((session) => (
                                     <tr key={session.id} className="hover:bg-slate-50/50 transition-colors">
-                                        <td className="px-8 py-6 text-slate-500 font-medium text-sm">
-                                            {new Date(session.date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+                                        <td className="px-8 py-6 text-slate-500 font-medium text-sm whitespace-nowrap">
+                                            {new Date(session.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
                                         </td>
                                         <td className="px-8 py-6 font-bold text-slate-800 text-sm">
                                             {session.role}
+                                        </td>
+                                        <td className="px-8 py-6 text-center text-slate-500 font-semibold text-sm">
+                                            {session.semantic_score}
+                                        </td>
+                                        <td className="px-8 py-6 text-center text-slate-500 font-semibold text-sm">
+                                            {session.behavioral_score}
                                         </td>
                                         <td className="px-8 py-6 text-right">
                                             <span className={`inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm ${

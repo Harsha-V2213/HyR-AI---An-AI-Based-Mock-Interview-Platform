@@ -12,30 +12,70 @@ export default function ResumeUpload() {
 
     const handleUpload = async (e) => {
         e.preventDefault();
+        
+        if (!auth.currentUser) {
+            alert("Your session has expired. Please log in again.");
+            navigate('/login');
+            return;
+        }
+
         setLoading(true);
         const formData = new FormData();
         formData.append('resume', file);
         formData.append('interviewType', interviewType);
         formData.append('difficulty', difficulty);
 
-        const token = await auth.currentUser.getIdToken();
-        await axios.post('http://localhost:5000/api/upload_resume', formData, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        navigate('/interview');
+        try {
+            const token = await auth.currentUser.getIdToken(true);
+            await axios.post('http://localhost:5000/api/upload_resume', formData, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            navigate('/interview');
+        } catch (error) {
+            console.error("Upload failed:", error);
+            alert("Failed to upload resume. Please check your connection or log in again.");
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
-        <div className="max-w-2xl mx-auto pt-28 pb-12 px-4 relative z-10">
+        <div className="max-w-3xl mx-auto pt-28 pb-12 px-4 relative z-10">
             {/* Background Glow */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full max-w-[600px] opacity-30 bg-gradient-to-r from-blue-400 to-indigo-400 blur-[100px] rounded-full pointer-events-none"></div>
 
             <div className="relative bg-white/70 backdrop-blur-xl p-8 md:p-12 rounded-3xl border border-slate-200/60 shadow-xl shadow-slate-200/40">
-                <div className="text-center mb-10">
+                <div className="text-center mb-8">
                     <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight mb-2">Session Configuration</h2>
                     <p className="text-slate-500 font-medium">Calibrate the AI engine with your resume and preferred parameters.</p>
                 </div>
                 
+                {/* --- NEW INSTRUCTIONS BLOCK --- */}
+                <div className="mb-10 p-6 rounded-2xl bg-gradient-to-br from-slate-50/80 to-blue-50/50 border border-slate-200/60 shadow-sm">
+                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-5 text-center">Platform Briefing</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
+                        {/* Desktop connecting lines */}
+                        <div className="hidden md:block absolute top-4 left-1/6 right-1/6 h-[2px] bg-gradient-to-r from-blue-100 via-indigo-100 to-emerald-100 z-0"></div>
+                        
+                        <div className="text-center relative z-10">
+                            <div className="w-8 h-8 mx-auto bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-sm mb-3 ring-4 ring-white">1</div>
+                            <p className="text-sm font-bold text-slate-800 mb-1">Upload & Calibrate</p>
+                            <p className="text-[11px] text-slate-500 leading-relaxed font-medium">Provide your PDF resume. The AI will instantly read your experience to generate highly targeted, personalized questions.</p>
+                        </div>
+                        <div className="text-center relative z-10">
+                            <div className="w-8 h-8 mx-auto bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold text-sm mb-3 ring-4 ring-white">2</div>
+                            <p className="text-sm font-bold text-slate-800 mb-1">Set Parameters</p>
+                            <p className="text-[11px] text-slate-500 leading-relaxed font-medium">Adjust the difficulty and interview style to simulate anything from a junior HR screen to a senior technical deep-dive.</p>
+                        </div>
+                        <div className="text-center relative z-10">
+                            <div className="w-8 h-8 mx-auto bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center font-bold text-sm mb-3 ring-4 ring-white">3</div>
+                            <p className="text-sm font-bold text-slate-800 mb-1">Live Simulation</p>
+                            <p className="text-[11px] text-slate-500 leading-relaxed font-medium">Engage the AI through your microphone. We monitor your semantics and behavioral cues (eye contact) for a final CRI score.</p>
+                        </div>
+                    </div>
+                </div>
+                {/* ------------------------------ */}
+
                 <form onSubmit={handleUpload} className="space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Seniority Dropdown */}
@@ -73,7 +113,7 @@ export default function ResumeUpload() {
                                 📄
                             </div>
                             <span className="text-sm font-semibold text-slate-600">Click or drag PDF resume here</span>
-                            {file && <p className="mt-2 text-blue-600 text-sm font-bold bg-blue-50 px-3 py-1 rounded-full shadow-sm">{file.name}</p>}
+                            {file && <p className="mt-2 text-blue-600 text-sm font-bold bg-blue-50 px-3 py-1 rounded-full shadow-sm border border-blue-100">{file.name}</p>}
                         </div>
                     </div>
 

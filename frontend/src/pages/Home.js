@@ -16,7 +16,7 @@ export default function Home() {
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-600"></span>
                     </span>
-                    <span className="text-sm font-semibold text-slate-700">MockPro v4.0 Intelligence Engine</span>
+                    <span className="text-sm font-semibold text-slate-700">HyR-AI - An Ai-Based Mock Interview Simulation Platform</span>
                 </div>
 
                 {/* Gradient Header */}
@@ -28,7 +28,7 @@ export default function Home() {
                 </h1>
 
                 <p className="text-lg md:text-xl text-slate-600 font-medium mb-12 leading-relaxed max-w-2xl mx-auto">
-                    A professional-grade interview simulation platform. Analyze technical depth, monitor behavioral cues, and receive high-fidelity AI evaluations.
+                    A professional-grade interview simulation platform. Made for Job-seeking Individuals to improve on their Interview game
                 </p>
 
                 {/* Primary & Secondary Actions */}

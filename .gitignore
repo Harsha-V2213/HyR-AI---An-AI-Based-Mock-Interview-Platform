@@ -1,29 +1,7 @@
-# ----------
-# API Keys and Secrets (CRITICAL)
-# ----------
+# Security
 .env
 firebase-key.json
 
-# ----------
-# Backend (Python / Flask)
-# ----------
+# Python Environments
 venv/
-env/
 __pycache__/
-*.pyc
-temp.pdf
-temp_resume.pdf
-instance/
-mockpro.db
-
-# ----------
-# Frontend (React)
-# ----------
-node_modules/
-build/
-.DS_Store
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-.vscode/

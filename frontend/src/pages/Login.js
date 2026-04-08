@@ -58,7 +58,7 @@ export default function Login() {
                         {isSignUp ? "Create an account" : "Welcome back"}
                     </h2>
                     <p className="text-sm text-slate-500 mt-2 font-medium">
-                        Access your MockPro intelligence workspace.
+                        Access your HyR-AI intelligence workspace.
                     </p>
                 </div>
 
