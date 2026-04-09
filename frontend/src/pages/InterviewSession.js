@@ -5,7 +5,7 @@ import { auth } from '../firebase';
 
 const InterviewSession = () => {
     const navigate = useNavigate();
-    const API_BASE_URL = "http://localhost:5000"; // Update this when you deploy
+    const API_BASE_URL = "http://localhost:5000"; 
     
     const [aiState, setAiState] = useState({
         status: "Connecting...",
@@ -16,21 +16,16 @@ const InterviewSession = () => {
     const [behavior, setBehavior] = useState({ status: "Waiting for camera...", emotion: null });
     const [frameCount, setFrameCount] = useState(0);
 
-    // Hardware Tracking Refs
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
-    const streamRef = useRef(null); // Reference to the active mic/cam stream
+    const streamRef = useRef(null); 
     const mediaRecorderRef = useRef(null);
     const audioChunksRef = useRef([]);
     const frameIntervalRef = useRef(null);
 
-    // --- FUNCTION TO KILL CAMERA AND MIC ---
     const stopAllHardware = () => {
-        console.log("Shutting down hardware...");
         if (streamRef.current) {
-            streamRef.current.getTracks().forEach(track => {
-                track.stop(); // Physically turn off hardware lights
-            });
+            streamRef.current.getTracks().forEach(track => track.stop());
             streamRef.current = null;
         }
         if (frameIntervalRef.current) {
@@ -43,7 +38,7 @@ const InterviewSession = () => {
         const startHardware = async () => {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                streamRef.current = stream; // Save stream to ref for later cleanup
+                streamRef.current = stream; 
                 
                 if (videoRef.current) {
                     videoRef.current.srcObject = stream;
@@ -83,7 +78,6 @@ const InterviewSession = () => {
         startHardware();
         fetchSessionState();
 
-        // Cleanup: Stop hardware if user leaves the page
         return () => stopAllHardware();
     }, []);
 
@@ -114,7 +108,6 @@ const InterviewSession = () => {
             });
             setAiState(res.data);
             
-            // 🚨 IF COMPLETE: Stop hardware immediately
             if (res.data.current_state === "COMPLETE") {
                 stopAllHardware();
             }
@@ -137,35 +130,42 @@ const InterviewSession = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col items-center py-12 px-4">
-            <h1 className="text-3xl font-extrabold text-gray-900 mb-8">Live Mock Interview</h1>
-            <div className="w-full max-w-4xl bg-white rounded-2xl shadow-xl p-8 flex flex-col items-center">
+        // 1. Strict height constraint (h-screen) and disabled scrolling (overflow-hidden)
+        <div className="h-screen bg-gray-50 flex flex-col items-center py-4 px-4 overflow-hidden">
+            
+            <h1 className="text-2xl font-extrabold text-gray-900 mb-4 flex-shrink-0">Live Mock Interview</h1>
+            
+            <div className="w-full max-w-4xl bg-white rounded-2xl shadow-xl p-6 flex flex-col items-center flex-1 min-h-0">
                 
-                <div className="mb-6">
+                {/* Status Badge */}
+                <div className="mb-4 flex-shrink-0">
                     <span className="bg-indigo-100 text-indigo-800 text-xs font-bold px-3 py-1.5 rounded-full uppercase">
                         {aiState.status}
                     </span>
                 </div>
 
-                <div className="relative w-full max-w-2xl aspect-video bg-black rounded-xl overflow-hidden mb-6 border border-gray-200">
+                {/* 2. Video dynamically scales to fill available middle space */}
+                <div className="relative w-full max-w-2xl bg-black rounded-xl overflow-hidden mb-4 border border-gray-200 flex-1 min-h-0 flex items-center justify-center">
                     <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover transform scale-x-[-1]" />
                     <canvas ref={canvasRef} width="640" height="480" className="hidden" />
                 </div>
 
-                <div className="w-full max-w-2xl flex justify-between px-6 py-3 bg-gray-50 rounded-lg text-sm font-semibold mb-10">
+                {/* Behavior Stats */}
+                <div className="w-full max-w-2xl flex justify-between px-6 py-2 bg-gray-50 rounded-lg text-sm font-semibold mb-6 flex-shrink-0">
                     <span className={behavior.status.includes("Lost") ? "text-red-500" : "text-emerald-600"}>{behavior.status}</span>
                     <span className="text-blue-600">Emotion: {behavior.emotion?.toUpperCase() || "ANALYZING..."}</span>
                 </div>
 
-                <div className="w-full max-w-2xl flex flex-col items-center text-center">
-                    <h2 className="text-2xl font-semibold text-gray-800 mb-8 leading-relaxed">
+                {/* 3. Question & Controls kept at the bottom (flex-shrink-0 stops them from being crushed) */}
+                <div className="w-full max-w-2xl flex flex-col items-center text-center flex-shrink-0">
+                    <h2 className="text-xl font-semibold text-gray-800 mb-6 leading-relaxed line-clamp-3">
                         {aiState.current_state === "COMPLETE" ? "Session Complete" : aiState.current_question}
                     </h2>
                     
                     {aiState.current_state === "COMPLETE" && aiState.results && (
-                        <div className="bg-emerald-50 border border-emerald-200 p-6 rounded-xl mb-8 w-full">
-                            <p className="font-bold text-emerald-800 text-lg mb-4">Final Evaluation</p>
-                            <div className="space-y-2 text-emerald-900 font-medium">
+                        <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl mb-6 w-full">
+                            <p className="font-bold text-emerald-800 text-md mb-2">Final Evaluation</p>
+                            <div className="flex justify-around text-emerald-900 font-medium text-sm">
                                 <p>CRI: {aiState.results.cri}/100</p>
                                 <p>Semantic: {aiState.results.semantic}%</p>
                                 <p>Behavior: {aiState.results.behavioral}%</p>
@@ -173,9 +173,9 @@ const InterviewSession = () => {
                         </div>
                     )}
 
-                    <div className="mt-4 w-full flex justify-center">
+                    <div className="w-full flex justify-center pb-2">
                         {aiState.is_busy ? (
-                            <button disabled className="bg-gray-400 text-white px-8 py-3.5 rounded-lg font-bold flex items-center shadow-sm cursor-not-allowed">
+                            <button disabled className="bg-gray-400 text-white px-8 py-3 rounded-lg font-bold flex items-center shadow-sm cursor-not-allowed">
                                 <svg className="animate-spin h-5 w-5 mr-3 text-white" viewBox="0 0 24 24">
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -183,15 +183,15 @@ const InterviewSession = () => {
                                 Processing Response
                             </button>
                         ) : aiState.current_state === "COMPLETE" ? (
-                            <button onClick={() => navigate('/history')} className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3.5 rounded-lg font-bold shadow-md w-full max-w-xs">
+                            <button onClick={() => navigate('/history')} className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-lg font-bold shadow-md w-full max-w-xs transition-colors">
                                 View History
                             </button>
                         ) : aiState.current_state === "RECORDING" ? (
-                            <button onClick={handleStopRecording} className="bg-red-600 hover:bg-red-700 text-white px-8 py-3.5 rounded-lg font-bold shadow-md animate-pulse w-full max-w-xs">
+                            <button onClick={handleStopRecording} className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-lg font-bold shadow-md animate-pulse w-full max-w-xs transition-colors">
                                 Stop Answering
                             </button>
                         ) : (
-                            <button onClick={handleStartRecording} className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3.5 rounded-lg font-bold shadow-md w-full max-w-xs">
+                            <button onClick={handleStartRecording} className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3 rounded-lg font-bold shadow-md w-full max-w-xs transition-colors">
                                 Start Answering
                             </button>
                         )}

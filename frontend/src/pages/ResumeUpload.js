@@ -122,7 +122,7 @@ export default function ResumeUpload() {
                         disabled={!file || loading} 
                         className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 disabled:from-slate-300 disabled:to-slate-300 disabled:text-slate-500 disabled:shadow-none text-white font-bold rounded-xl shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:-translate-y-0.5 transition-all duration-300 text-base"
                     >
-                        {loading ? "Calibrating Neural Engine..." : "Initialize Session"}
+                        {loading ? "Calibrating Questions just for you..." : "Initialize Session"}
                     </button>
                 </form>
             </div>
